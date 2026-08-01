@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Daydream",
+    "slug": "daydream",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "daydream",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#F5F5F8"
+    },
+    "android": {
+      "package": "com.daydream.reader",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#F5F5F8"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.daydream.reader"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "49001182-3e4c-4b59-ac69-8fa3030bd4fd"
+      }
+    }
+  }
+}
