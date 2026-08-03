@@ -38,3 +38,29 @@ export async function updateReadingProgress(ncode: string, site: string, episode
     await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
   }
 }
+
+// ============================================================
+// スクロール位置保存
+// ============================================================
+
+const SCROLL_KEY = "@daydream/scroll-positions";
+
+/** スクロール位置を保存 */
+export async function saveScrollPosition(ncode: string, site: string, episode: number, position: number): Promise<void> {
+  try {
+    const json = await AsyncStorage.getItem(SCROLL_KEY);
+    const data: Record<string, number> = json ? JSON.parse(json) : {};
+    data[`${site}:${ncode.toLowerCase()}:${episode}`] = position;
+    await AsyncStorage.setItem(SCROLL_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+/** スクロール位置を取得 */
+export async function getScrollPosition(ncode: string, site: string, episode: number): Promise<number> {
+  try {
+    const json = await AsyncStorage.getItem(SCROLL_KEY);
+    if (!json) return 0;
+    const data: Record<string, number> = JSON.parse(json);
+    return data[`${site}:${ncode.toLowerCase()}:${episode}`] ?? 0;
+  } catch { return 0; }
+}

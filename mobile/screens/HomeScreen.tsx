@@ -38,7 +38,14 @@ export default function HomeScreen({ navigation }: Props) {
         data={favorites}
         keyExtractor={(item) => `${item.site}-${item.ncode}`}
         renderItem={({ item }) => (
-          <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} onPress={() => navigation.navigate("NovelDetail", { ncode: item.ncode, site: item.site })}>
+          <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} onPress={() => {
+            // 読みかけがあればリーダーに直接遷移
+            if (item.lastReadEpisode && item.lastReadEpisode > 0) {
+              navigation.navigate("Reader", { ncode: item.ncode, episode: item.lastReadEpisode, site: item.site });
+            } else {
+              navigation.navigate("NovelDetail", { ncode: item.ncode, site: item.site });
+            }
+          }}>
             <Text style={[styles.cardUpdated, { color: colors.textMuted }]}>{formatDate(item.lastUpdated || item.addedAt)} 更新</Text>
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>{cleanTitle(item.title)}</Text>
             <View style={styles.cardRow}>

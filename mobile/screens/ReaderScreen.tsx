@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, useColorScheme } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import type { RootStackParamList } from "../App";
 import { getEpisodeContent } from "../lib/api";
-import { updateReadingProgress } from "../lib/storage";
+import { updateReadingProgress, saveScrollPosition, getScrollPosition } from "../lib/storage";
 import { getCachedEpisode, cacheEpisode } from "../lib/cache";
 import { loadSettings, FONT_FAMILY_OPTIONS, FONT_SIZE_OPTIONS, type AppSettings } from "../lib/settings";
 import type { EpisodeContent, SiteMode } from "../lib/types";
@@ -31,7 +31,6 @@ export default function ReaderScreen({ route, navigation }: Props) {
       const cached = await getCachedEpisode(ncode, ep, site);
       if (cached) {
         setContent(cached);
-        updateReadingProgress(ncode.toUpperCase(), site, ep, cached.total_episodes || undefined);
         setLoading(false);
         return;
       }
@@ -43,7 +42,6 @@ export default function ReaderScreen({ route, navigation }: Props) {
         setError("本文の取得に失敗しました");
         return;
       }
-      updateReadingProgress(ncode.toUpperCase(), site, ep, data.total_episodes || undefined);
 
       // キャッシュに保存
       cacheEpisode(ncode, ep, site, data);
@@ -51,7 +49,49 @@ export default function ReaderScreen({ route, navigation }: Props) {
     finally { setLoading(false); }
   }, [ncode, site]);
 
+  const webViewRef = useRef<any>(null);
+  const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => { fetchContent(currentEp); }, [currentEp, fetchContent]);
+
+  // スクロール位置復元
+  useEffect(() => {
+    if (content && !loading && webViewRef.current) {
+      getScrollPosition(ncode, site, currentEp).then(pos => {
+        if (pos > 0) {
+          setTimeout(() => {
+            webViewRef.current?.injectJavaScript(`
+              (function() {
+                var el = document.querySelector('.reader');
+                if (el) {
+                  var isV = getComputedStyle(el).writingMode.includes('vertical');
+                  if (isV) el.scrollLeft = -${pos};
+                  else el.scrollTop = ${pos};
+                }
+              })();
+              true;
+            `);
+          }, 300);
+        }
+      });
+    }
+  }, [content, loading, currentEp]);
+
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === "reachedEnd") {
+        // 最後までスクロールしたら読了
+        updateReadingProgress(ncode.toUpperCase(), site, currentEp, content?.total_episodes || undefined);
+      } else if (msg.type === "scroll") {
+        // スクロール位置を定期保存
+        if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
+        scrollSaveTimer.current = setTimeout(() => {
+          saveScrollPosition(ncode, site, currentEp, msg.position);
+        }, 500);
+      }
+    } catch {}
+  };
 
   const generateHtml = () => {
     if (!content || !settings) return "";
@@ -114,6 +154,27 @@ html, body {
   ${content.subtitle ? `<div class="subtitle">${escapeHtml(content.subtitle)}</div>` : ""}
   <div class="body">${bodyHtml}</div>
 </div>
+<script>
+(function() {
+  var el = document.querySelector('.reader');
+  if (!el) return;
+  var isV = getComputedStyle(el).writingMode.indexOf('vertical') >= 0;
+  var sent = false;
+  el.addEventListener('scroll', function() {
+    var pos = isV ? Math.abs(el.scrollLeft) : el.scrollTop;
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'scroll', position: pos }));
+    if (!sent) {
+      var atEnd = isV
+        ? (Math.abs(el.scrollLeft) + el.clientWidth >= el.scrollWidth - 20)
+        : (el.scrollTop + el.clientHeight >= el.scrollHeight - 20);
+      if (atEnd) {
+        sent = true;
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'reachedEnd' }));
+      }
+    }
+  });
+})();
+</script>
 </body></html>`;
   };
 
@@ -152,13 +213,15 @@ html, body {
       )}
       {content && !loading && !error && settings && (
         <WebView
+          ref={webViewRef}
           originWhitelist={["*"]}
           source={{ html: generateHtml() }}
           style={[styles.webview, { backgroundColor: containerBg }]}
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
           scrollEnabled={true}
-          javaScriptEnabled={false}
+          javaScriptEnabled={true}
+          onMessage={handleWebViewMessage}
         />
       )}
 

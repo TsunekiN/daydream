@@ -38,7 +38,7 @@ function AppContent() {
             contentStyle: { backgroundColor: colors.background },
           }}
         >
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: "Daydream" }} />
+          <Stack.Screen name="Home" component={HomeScreen} options={{ title: "お気に入りリスト" }} />
           <Stack.Screen name="Search" component={SearchScreen} options={{ title: "検索" }} />
           <Stack.Screen name="NovelDetail" component={NovelDetailScreen} options={{ title: "作品情報" }} />
           <Stack.Screen name="Reader" component={ReaderScreen} options={{ headerShown: false }} />
@@ -77,11 +77,11 @@ function SettingsFab({ navRef, isDark, colors }: { navRef: React.RefObject<any>;
 
   return (
     <TouchableOpacity
-      style={[fabStyles.fab, { backgroundColor: isDark ? "rgba(50,50,55,0.9)" : "rgba(255,255,255,0.9)" }]}
+      style={[fabStyles.fab, { backgroundColor: isDark ? "rgba(100,100,110,0.9)" : "rgba(255,255,255,0.9)" }]}
       onPress={handlePress}
       activeOpacity={0.8}
     >
-      <Text style={fabStyles.fabText}>⚙</Text>
+      <Text style={[fabStyles.fabText, { color: isDark ? "#F0F0F0" : "#333" }]}>⚙</Text>
     </TouchableOpacity>
   );
 }
