@@ -16,6 +16,17 @@ type Props = NativeStackScreenProps<RootStackParamList, "NovelDetail">;
 export default function NovelDetailScreen({ route, navigation }: Props) {
   const { ncode, site } = route.params;
   const { colors } = useTheme();
+
+  // 戻るボタンを常にお気に入りリストへ
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => navigation.navigate("Home")} style={{ padding: 8 }}>
+          <Text style={{ fontSize: 16, color: colors.accent }}>←</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors]);
   const [info, setInfo] = useState<NovelInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFav, setIsFav] = useState(false);
