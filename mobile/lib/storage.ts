@@ -44,6 +44,27 @@ export async function updateReadingProgress(ncode: string, site: string, episode
 // ============================================================
 
 const SCROLL_KEY = "@daydream/scroll-positions";
+const LAST_OPENED_KEY = "@daydream/last-opened";
+
+/** 最後に開いていたエピソードを保存 */
+export async function saveLastOpened(ncode: string, site: string, episode: number): Promise<void> {
+  try {
+    const json = await AsyncStorage.getItem(LAST_OPENED_KEY);
+    const data: Record<string, number> = json ? JSON.parse(json) : {};
+    data[`${site}:${ncode.toLowerCase()}`] = episode;
+    await AsyncStorage.setItem(LAST_OPENED_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+/** 最後に開いていたエピソードを取得 */
+export async function getLastOpened(ncode: string, site: string): Promise<number | null> {
+  try {
+    const json = await AsyncStorage.getItem(LAST_OPENED_KEY);
+    if (!json) return null;
+    const data: Record<string, number> = JSON.parse(json);
+    return data[`${site}:${ncode.toLowerCase()}`] ?? null;
+  } catch { return null; }
+}
 
 /** スクロール位置を保存 */
 export async function saveScrollPosition(ncode: string, site: string, episode: number, position: number): Promise<void> {

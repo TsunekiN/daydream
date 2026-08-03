@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import type { RootStackParamList } from "../App";
 import { getEpisodeContent } from "../lib/api";
-import { updateReadingProgress, saveScrollPosition, getScrollPosition } from "../lib/storage";
+import { updateReadingProgress, saveScrollPosition, getScrollPosition, saveLastOpened } from "../lib/storage";
 import { getCachedEpisode, cacheEpisode } from "../lib/cache";
 import { loadSettings, FONT_FAMILY_OPTIONS, FONT_SIZE_OPTIONS, type AppSettings } from "../lib/settings";
 import type { EpisodeContent, SiteMode } from "../lib/types";
@@ -31,6 +31,7 @@ export default function ReaderScreen({ route, navigation }: Props) {
       const cached = await getCachedEpisode(ncode, ep, site);
       if (cached) {
         setContent(cached);
+        saveLastOpened(ncode.toUpperCase(), site, ep);
         setLoading(false);
         return;
       }
@@ -45,6 +46,7 @@ export default function ReaderScreen({ route, navigation }: Props) {
 
       // キャッシュに保存
       cacheEpisode(ncode, ep, site, data);
+      saveLastOpened(ncode.toUpperCase(), site, ep);
     } catch (e) { setError(e instanceof Error ? e.message : "取得に失敗しました"); }
     finally { setLoading(false); }
   }, [ncode, site]);
@@ -190,7 +192,7 @@ html, body {
     <SafeAreaView style={[styles.container, { backgroundColor: containerBg }]}>
       {/* Header: back + title + TTS controls */}
       <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderColor }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+        <TouchableOpacity onPress={() => navigation.navigate("NovelDetail", { ncode, site })} style={styles.headerBtn}>
           <Text style={[styles.backText, { color: accentColor }]}>←</Text>
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: textMain }]} numberOfLines={1}>

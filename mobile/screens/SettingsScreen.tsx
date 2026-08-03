@@ -138,8 +138,9 @@ export default function SettingsScreen({ navigation }: Props) {
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>プレビュー</Text>
         {settings.reader.layout === "vertical" ? (
-          <View style={[styles.previewBox, { height: 200, borderColor: colors.border }]}>
+          <View style={[styles.previewBox, { height: 200, borderColor: colors.border, backgroundColor: colors.background }]}>
             <WebView
+              key={`preview-${settings.theme}-${settings.reader.fontFamily}-${settings.reader.fontSize}-${settings.reader.lineHeight}-${settings.reader.letterSpacing}`}
               originWhitelist={["*"]}
               source={{ html: `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:${colors.background};height:100%;overflow:hidden}.v{writing-mode:vertical-rl;-webkit-writing-mode:vertical-rl;text-orientation:mixed;height:100%;overflow-x:auto;overflow-y:hidden;padding:12px;font-family:${FONT_FAMILY_OPTIONS[settings.reader.fontFamily].css};font-size:${FONT_SIZE_OPTIONS[settings.reader.fontSize].px}px;line-height:${settings.reader.lineHeight};letter-spacing:${settings.reader.letterSpacing}em;color:${colors.text}}p{margin-left:0.5em}</style></head><body><div class="v"><p>吾輩は猫である。名前はまだ無い。</p><p>どこで生れたかとんと見当がつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。</p></div></body></html>` }}
               style={{ flex: 1, backgroundColor: colors.background }}
@@ -148,7 +149,7 @@ export default function SettingsScreen({ navigation }: Props) {
             />
           </View>
         ) : (
-          <View style={[styles.previewBox, { borderColor: colors.border }]}>
+          <View style={[styles.previewBox, { borderColor: colors.border, backgroundColor: colors.background }]}>
             <Text style={{
               fontSize: FONT_SIZE_OPTIONS[settings.reader.fontSize].px,
               lineHeight: FONT_SIZE_OPTIONS[settings.reader.fontSize].px * settings.reader.lineHeight,

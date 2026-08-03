@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
-import { getFavorites } from "../lib/storage";
+import { getFavorites, getLastOpened } from "../lib/storage";
 import { cleanTitle } from "../lib/api";
 import { useTheme } from "../lib/ThemeContext";
 import type { FavoriteNovel } from "../lib/types";
@@ -38,10 +38,13 @@ export default function HomeScreen({ navigation }: Props) {
         data={favorites}
         keyExtractor={(item) => `${item.site}-${item.ncode}`}
         renderItem={({ item }) => (
-          <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} onPress={() => {
-            // 読みかけがあればリーダーに直接遷移
-            if (item.lastReadEpisode && item.lastReadEpisode > 0) {
-              navigation.navigate("Reader", { ncode: item.ncode, episode: item.lastReadEpisode, site: item.site });
+          <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} onPress={async () => {
+            // 最後に開いていたエピソードがあればそこから再開
+            const lastOpened = await getLastOpened(item.ncode, item.site);
+            if (lastOpened && lastOpened > 0) {
+              navigation.navigate("Reader", { ncode: item.ncode, episode: lastOpened, site: item.site });
+            } else if (item.lastReadEpisode && item.lastReadEpisode > 0) {
+              navigation.navigate("Reader", { ncode: item.ncode, episode: item.lastReadEpisode + 1, site: item.site });
             } else {
               navigation.navigate("NovelDetail", { ncode: item.ncode, site: item.site });
             }
