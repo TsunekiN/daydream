@@ -1,6 +1,6 @@
 # Daydream — Specifications
 
-**Version**: 1.0.0  
+**Version**: 0.2.0  
 **Platform**: Android (React Native / Expo)  
 **Last Updated**: 2026-08-01
 
