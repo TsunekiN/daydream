@@ -76,8 +76,8 @@ export default function NovelDetailScreen({ route, navigation }: Props) {
             {site === "nocturne" ? "ノクターン" : "なろう"}
           </Text>
         </View>
-        <TouchableOpacity style={[styles.favIcon, isFav && styles.favIconActive]} onPress={toggleFav}>
-          <Text style={[styles.favIconText, isFav && styles.favIconTextActive]}>{isFav ? "★" : "☆"}</Text>
+        <TouchableOpacity style={[styles.favIcon, { backgroundColor: isFav ? "rgba(99,102,241,0.1)" : colors.border }]} onPress={toggleFav}>
+          <Text style={[styles.favIconText, { color: isFav ? colors.accent : colors.textMuted }]}>{isFav ? "★" : "☆"}</Text>
         </TouchableOpacity>
       </View>
 

@@ -96,20 +96,31 @@ export async function getEpisodeContent(ncode: string, episode: number, site: Si
   // subtitle
   const subtitleMatch = html.match(/<p[^>]*class="[^"]*p-novel__title[^"]*"[^>]*>([\s\S]*?)<\/p>/i)
     ?? html.match(/<[^>]*class="[^"]*novel_subtitle[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/i);
-  const subtitle = subtitleMatch ? stripTags(subtitleMatch[1]).trim() : "";
+  let subtitle = subtitleMatch ? stripTags(subtitleMatch[1]).trim() : "";
 
-  // body - try multiple patterns
+  // フォールバック: <title>作品名 - サブタイトル</title> から抽出
+  if (!subtitle) {
+    const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
+    if (titleMatch && titleMatch[1].includes(" - ")) {
+      subtitle = titleMatch[1].split(" - ").slice(1).join(" - ").trim();
+    }
+  }
+
+  // body - extract novel text
   let bodyHtml = "";
-  const bodyPatterns = [
-    /<div[^>]*id="novel_honbun"[^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]*class="[^"]*js-novel-text[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]*class="[^"]*p-novel__text[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-  ];
-  for (const pattern of bodyPatterns) {
-    const m = html.match(pattern);
-    if (m && m[1].trim().length > 50) {
-      bodyHtml = m[1];
-      break;
+
+  // 方法1: <p id="L数字"> または <p id="Lp数字">(まえがき) <p id="La数字">(あとがき) を全て抽出
+  const pTagRegex = /<p id="L[pa]?\d+"[^>]*>[\s\S]*?<\/p>/gi;
+  const pTags = html.match(pTagRegex);
+  if (pTags && pTags.length > 0) {
+    bodyHtml = pTags.join("\n");
+  }
+
+  // フォールバック: 旧デザイン novel_honbun
+  if (bodyHtml.trim().length < 50) {
+    const oldMatch = html.match(/<div[^>]*id="novel_honbun"[^>]*>([\s\S]+?)<\/div>/i);
+    if (oldMatch && oldMatch[1].trim().length > 50) {
+      bodyHtml = oldMatch[1];
     }
   }
   bodyHtml = bodyHtml.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
@@ -118,13 +129,14 @@ export async function getEpisodeContent(ncode: string, episode: number, site: Si
   let prevNumber: number | null = episode > 1 ? episode - 1 : null;
   let nextNumber: number | null = null;
 
-  // episode number pattern: "3/150"
-  const numMatch = html.match(/(\d+)\s*\/\s*(\d+)\s*</);
-  if (numMatch) {
-    totalEpisodes = parseInt(numMatch[2], 10);
+  // 話数検出: なろう公式のページ番号表示 "XX/YY" をノード内テキストから取得
+  // class="p-novel__number" または id="novel_no" 内のパターンのみを対象にする
+  const novelNoMatch = html.match(/<[^>]*(?:class="[^"]*p-novel__number[^"]*"|id="novel_no")[^>]*>[^<]*?(\d+)\s*\/\s*(\d+)/i);
+  if (novelNoMatch) {
+    totalEpisodes = parseInt(novelNoMatch[2], 10);
     if (episode < totalEpisodes) nextNumber = episode + 1;
   } else {
-    // check for next link
+    // フォールバック: 次へリンクの存在で判定
     if (html.includes("c-pager__item--next") || html.includes("novel_bn_next")) {
       nextNumber = episode + 1;
     }

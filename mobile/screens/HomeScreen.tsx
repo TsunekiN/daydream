@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert, Animated } from "react-native";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
-import { getFavorites, getLastOpened } from "../lib/storage";
+import { getFavorites, getLastOpened, removeFavorite } from "../lib/storage";
 import { cleanTitle } from "../lib/api";
 import { useTheme } from "../lib/ThemeContext";
 import type { FavoriteNovel } from "../lib/types";
@@ -33,22 +35,41 @@ export default function HomeScreen({ navigation }: Props) {
   const onRefresh = async () => { setRefreshing(true); await loadFavorites(); setRefreshing(false); };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={favorites}
         keyExtractor={(item) => `${item.site}-${item.ncode}`}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} onPress={async () => {
-            // 最後に開いていたエピソードがあればそこから再開
-            const lastOpened = await getLastOpened(item.ncode, item.site);
-            if (lastOpened && lastOpened > 0) {
-              navigation.navigate("Reader", { ncode: item.ncode, episode: lastOpened, site: item.site });
-            } else if (item.lastReadEpisode && item.lastReadEpisode > 0) {
-              navigation.navigate("Reader", { ncode: item.ncode, episode: item.lastReadEpisode + 1, site: item.site });
-            } else {
-              navigation.navigate("NovelDetail", { ncode: item.ncode, site: item.site });
-            }
-          }}>
+        renderItem={({ item }) => {
+          const renderRightActions = () => (
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => {
+                Alert.alert("削除", `「${item.title}」を削除しますか？`, [
+                  { text: "キャンセル", style: "cancel" },
+                  { text: "削除", style: "destructive", onPress: async () => { await removeFavorite(item.ncode, item.site); loadFavorites(); }},
+                ]);
+              }}
+            >
+              <Text style={styles.deleteBtnText}>削除</Text>
+            </TouchableOpacity>
+          );
+
+          return (
+            <Swipeable renderRightActions={renderRightActions} overshootRight={false} rightThreshold={40}>
+              <TouchableOpacity
+                style={[styles.card, { backgroundColor: colors.card }]}
+                activeOpacity={1}
+                onPress={async () => {
+                  const lastOpened = await getLastOpened(item.ncode, item.site);
+                  if (lastOpened && lastOpened > 0) {
+                    navigation.navigate("Reader", { ncode: item.ncode, episode: lastOpened, site: item.site });
+                  } else if (item.lastReadEpisode && item.lastReadEpisode > 0) {
+                    navigation.navigate("Reader", { ncode: item.ncode, episode: item.lastReadEpisode + 1, site: item.site });
+                  } else {
+                    navigation.navigate("NovelDetail", { ncode: item.ncode, site: item.site });
+                  }
+                }}
+              >
             <Text style={[styles.cardUpdated, { color: colors.textMuted }]}>{formatDate(item.lastUpdated || item.addedAt)} 更新</Text>
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>{cleanTitle(item.title)}</Text>
             <View style={styles.cardRow}>
@@ -56,7 +77,9 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={[styles.cardMeta, { color: colors.textMuted }]}>{item.lastReadEpisode ?? 0}/{item.totalEpisodes ?? "?"}話</Text>
             </View>
           </TouchableOpacity>
-        )}
+          </Swipeable>
+          );
+        }}
         ListEmptyComponent={() => (
           <View style={styles.empty}>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>お気に入りがありません</Text>
@@ -72,7 +95,7 @@ export default function HomeScreen({ navigation }: Props) {
       <TouchableOpacity style={[styles.fab, { backgroundColor: colors.accent }]} onPress={() => navigation.navigate("Search")}>
         <Text style={styles.fabText}>検索</Text>
       </TouchableOpacity>
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -91,4 +114,6 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 15, fontWeight: "600", color: "#FFF" },
   fab: { position: "absolute", bottom: 48, right: 24, backgroundColor: "#6366F1", borderRadius: 28, width: 56, height: 56, alignItems: "center", justifyContent: "center", elevation: 6 },
   fabText: { fontSize: 12, fontWeight: "700", color: "#FFF" },
+  deleteBtn: { backgroundColor: "#EF4444", justifyContent: "center", alignItems: "center", width: 72, borderRadius: 10, marginBottom: 6, marginLeft: 8 },
+  deleteBtnText: { color: "#FFF", fontSize: 12, fontWeight: "700" },
 });

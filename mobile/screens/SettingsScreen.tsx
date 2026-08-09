@@ -1,5 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { WebView } from "react-native-webview";
+import NativeSlider from "@react-native-community/slider";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import Slider from "./Slider";
 import type { RootStackParamList } from "../App";
@@ -104,11 +105,15 @@ export default function SettingsScreen({ navigation }: Props) {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>行間</Text>
           <Text style={[styles.sliderValue, { color: colors.accent }]}>{settings.reader.lineHeight.toFixed(1)}</Text>
         </View>
-        <Slider
-          min={15}
-          max={30}
-          value={Math.round(settings.reader.lineHeight * 10)}
-          onValueChange={(v) => updateReaderSettings({ lineHeight: v / 10 })}
+        <NativeSlider
+          minimumValue={1.5}
+          maximumValue={3.0}
+          step={0.1}
+          value={settings.reader.lineHeight}
+          onValueChange={(v) => updateReaderSettings({ lineHeight: Math.round(v * 10) / 10 })}
+          minimumTrackTintColor={colors.accent}
+          maximumTrackTintColor={colors.border}
+          thumbTintColor={colors.accent}
         />
         <View style={styles.sliderLabels}>
           <Text style={[styles.sliderLabelText, { color: colors.textMuted }]}>狭い</Text>
@@ -122,11 +127,15 @@ export default function SettingsScreen({ navigation }: Props) {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>字間</Text>
           <Text style={[styles.sliderValue, { color: colors.accent }]}>{settings.reader.letterSpacing.toFixed(2)}em</Text>
         </View>
-        <Slider
-          min={0}
-          max={15}
-          value={Math.round(settings.reader.letterSpacing * 100)}
-          onValueChange={(v) => updateReaderSettings({ letterSpacing: v / 100 })}
+        <NativeSlider
+          minimumValue={0}
+          maximumValue={0.15}
+          step={0.01}
+          value={settings.reader.letterSpacing}
+          onValueChange={(v) => updateReaderSettings({ letterSpacing: Math.round(v * 100) / 100 })}
+          minimumTrackTintColor={colors.accent}
+          maximumTrackTintColor={colors.border}
+          thumbTintColor={colors.accent}
         />
         <View style={styles.sliderLabels}>
           <Text style={[styles.sliderLabelText, { color: colors.textMuted }]}>なし</Text>

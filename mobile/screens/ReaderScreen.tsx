@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import type { RootStackParamList } from "../App";
 import { getEpisodeContent } from "../lib/api";
-import { updateReadingProgress, saveScrollPosition, getScrollPosition, saveLastOpened } from "../lib/storage";
+import { updateReadingProgress, saveScrollPosition, getScrollPosition, saveLastOpened, getFavorites } from "../lib/storage";
 import { getCachedEpisode, cacheEpisode } from "../lib/cache";
 import { loadSettings, FONT_FAMILY_OPTIONS, FONT_SIZE_OPTIONS, type AppSettings } from "../lib/settings";
 import type { EpisodeContent, SiteMode } from "../lib/types";
@@ -20,9 +20,18 @@ export default function ReaderScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [currentEp, setCurrentEp] = useState(episode);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [knownTotal, setKnownTotal] = useState(0);
   const colorScheme = useColorScheme();
 
   useEffect(() => { loadSettings().then(setSettings); }, []);
+
+  // お気に入りから正確な total_episodes を取得
+  useEffect(() => {
+    getFavorites().then(favs => {
+      const fav = favs.find(f => f.ncode === ncode.toUpperCase() && f.site === site);
+      if (fav?.totalEpisodes) setKnownTotal(fav.totalEpisodes);
+    });
+  }, [ncode, site]);
 
   const fetchContent = useCallback(async (ep: number) => {
     setLoading(true); setError(null);
@@ -187,6 +196,7 @@ html, body {
   const textMain = isDark ? "#F0F0F0" : "#3A3A3C";
   const textSub = isDark ? "#A0A0A5" : "#8E8E93";
   const accentColor = "#6366F1";
+  const totalDisplay = content?.total_episodes || knownTotal;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: containerBg }]}>
@@ -242,7 +252,7 @@ html, body {
                 </Text>
               </TouchableOpacity>
               <Text style={[styles.epText, { color: textSub }]}>
-                {currentEp}{content.total_episodes ? ` / ${content.total_episodes}` : ""}話
+                {currentEp}{totalDisplay ? ` / ${totalDisplay}` : ""}話
               </Text>
               <TouchableOpacity
                 style={[styles.navBtn, { backgroundColor: isDark ? "#2A2A2D" : "#F0F0F5" }, !content.prev_number && { opacity: 0.3 }]}
@@ -266,7 +276,7 @@ html, body {
                 </Text>
               </TouchableOpacity>
               <Text style={[styles.epText, { color: textSub }]}>
-                {currentEp}{content.total_episodes ? ` / ${content.total_episodes}` : ""}話
+                {currentEp}{totalDisplay ? ` / ${totalDisplay}` : ""}話
               </Text>
               <TouchableOpacity
                 style={[styles.navBtn, { backgroundColor: isDark ? "#2A2A2D" : "#F0F0F5" }, !content.next_number && { opacity: 0.3 }]}

@@ -1,8 +1,8 @@
 # Daydream — Specifications
 
-**Version**: 0.2.0  
+**Version**: 0.4.0  
 **Platform**: Android (React Native / Expo)  
-**Last Updated**: 2026-08-01
+**Last Updated**: 2026-08-10
 
 ---
 
@@ -51,7 +51,7 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 | ジャンル | なろうのみ、折り返しチップ表示 |
 | ソート | 総合評価/ブクマ数/レビュー/週間pt/日間pt/月間pt/新着 |
 | 除外フィルタ | 設定画面の excludePreset に連動（BL/GL除外） |
-| 結果表示 | タイトル（タグ除去）、作者、あらすじ、話数/文字数/ブクマ/pt |
+| 結果表示 | 更新日、タイトル（タグ除去）、作者、あらすじ、話数/文字数/ブクマ/pt |
 
 ### 2.3 作品詳細画面
 
@@ -109,6 +109,8 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 | ナビゲーション | @react-navigation/native-stack v7 |
 | データ永続化 | @react-native-async-storage/async-storage |
 | リーダー | react-native-webview |
+| スライダー | @react-native-community/slider |
+| スワイプ削除 | react-native-gesture-handler / react-native-reanimated |
 | TTS | expo-speech |
 | 言語 | TypeScript 6.0 |
 | ランタイム | React 19.2.3 / React Native 0.86.2 |
@@ -179,6 +181,19 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 
 Cookie: `over18=yes`（ノクターン用）  
 User-Agent: Android Chrome 模倣
+
+**本文HTMLパース:**
+以下のパターンを優先度順に試行:
+1. `<p id="L数字">` / `<p id="Lp数字">` / `<p id="La数字">` — 全段落タグを抽出・連結
+2. `<div id="novel_honbun">` — 旧デザイン フォールバック
+
+**サブタイトル取得:**
+1. `<p class="p-novel__title">` — 新デザイン
+2. `<... class="novel_subtitle">` — 旧デザイン
+3. `<title>作品名 - サブタイトル</title>` — フォールバック
+
+**話数パース:**
+`<... class="p-novel__number">` または `<... id="novel_no">` 内の `XX/YY` パターンのみ対象。取得できない場合はお気に入り保存時の `general_all_no`（API値）をフォールバック使用。
 
 ---
 

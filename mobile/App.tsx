@@ -38,7 +38,7 @@ function AppContent() {
             contentStyle: { backgroundColor: colors.background },
           }}
         >
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: "お気に入りリスト" }} />
+          <Stack.Screen name="Home" component={HomeScreen} options={{ title: "お気に入りリスト", headerBackVisible: false }} />
           <Stack.Screen name="Search" component={SearchScreen} options={{ title: "検索" }} />
           <Stack.Screen name="NovelDetail" component={NovelDetailScreen} options={{ title: "作品情報" }} />
           <Stack.Screen name="Reader" component={ReaderScreen} options={{ headerShown: false }} />

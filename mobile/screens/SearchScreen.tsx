@@ -103,15 +103,15 @@ export default function SearchScreen({ navigation }: Props) {
           {/* Genre (narou only) */}
           {site === "narou" && (
             <View>
-              <Text style={styles.filterLabel}>ジャンル</Text>
+              <Text style={[styles.filterLabel, { color: colors.textSub }]}>ジャンル</Text>
               <View style={styles.chipWrap}>
                 {GENRE_OPTIONS.map((g) => (
                   <TouchableOpacity
                     key={g.label}
-                    style={[styles.chip, genre === g.value && styles.chipActive]}
+                    style={[styles.chip, { backgroundColor: colors.border }, genre === g.value && styles.chipActive]}
                     onPress={() => setGenre(g.value)}
                   >
-                    <Text style={[styles.chipText, genre === g.value && styles.chipTextActive]}>{g.label}</Text>
+                    <Text style={[styles.chipText, { color: colors.textSub }, genre === g.value && styles.chipTextActive]}>{g.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -120,15 +120,15 @@ export default function SearchScreen({ navigation }: Props) {
 
           {/* Sort */}
           <View>
-            <Text style={styles.filterLabel}>ソート順</Text>
+            <Text style={[styles.filterLabel, { color: colors.textSub }]}>ソート順</Text>
             <View style={styles.chipWrap}>
               {SORT_OPTIONS.map((s) => (
                 <TouchableOpacity
                   key={s.key}
-                  style={[styles.chip, order === s.key && styles.chipActive]}
+                  style={[styles.chip, { backgroundColor: colors.border }, order === s.key && styles.chipActive]}
                   onPress={() => setOrder(s.key)}
                 >
-                  <Text style={[styles.chipText, order === s.key && styles.chipTextActive]}>{s.label}</Text>
+                  <Text style={[styles.chipText, { color: colors.textSub }, order === s.key && styles.chipTextActive]}>{s.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -137,7 +137,7 @@ export default function SearchScreen({ navigation }: Props) {
       )}
 
       {/* Loading / Error / Count */}
-      {loading && <ActivityIndicator size="large" color="#6366F1" style={{ padding: 40 }} />}
+      {loading && <ActivityIndicator size="large" color={colors.accent} style={{ padding: 40 }} />}
       {error && <Text style={styles.errorText}>{error}</Text>}
       {!loading && results.length > 0 && <Text style={[styles.count, { color: colors.textMuted }]}>{allcount.toLocaleString()}件中 {results.length}件表示</Text>}
 
@@ -150,6 +150,7 @@ export default function SearchScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} onPress={() => navigation.navigate("NovelDetail", { ncode: item.ncode, site })}>
+              <Text style={[styles.cardUpdated, { color: colors.textMuted }]}>{item.novelupdated_at ? item.novelupdated_at.split(" ")[0] : ""} 更新</Text>
               <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>{cleanTitle(item.title)}</Text>
               <Text style={[styles.cardWriter, { color: colors.accent }]}>{item.writer}</Text>
               <Text style={[styles.cardStory, { color: colors.textSub }]} numberOfLines={3}>{item.story}</Text>
@@ -189,6 +190,7 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, color: "#DC2626", textAlign: "center", padding: 16 },
   count: { fontSize: 12, color: "#8E8E93", paddingHorizontal: 16, paddingTop: 8 },
   card: { backgroundColor: "#FFF", borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
+  cardUpdated: { fontSize: 9, marginBottom: 1 },
   cardTitle: { fontSize: 15, fontWeight: "600", color: "#111113", marginBottom: 4 },
   cardWriter: { fontSize: 12, color: "#6366F1", marginBottom: 6 },
   cardStory: { fontSize: 12, color: "#5A5A5E", lineHeight: 18, marginBottom: 8 },

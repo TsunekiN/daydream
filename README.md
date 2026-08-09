@@ -25,6 +25,8 @@ React Native (Expo SDK 57) で構築。バックエンド不要、全データ�
 | ナビゲーション | React Navigation (native-stack) v7 |
 | データ保存 | AsyncStorage |
 | リーダー | react-native-webview (CSS vertical-rl) |
+| スライダー | @react-native-community/slider |
+| スワイプ | react-native-gesture-handler + reanimated |
 | TTS | expo-speech |
 | 言語 | TypeScript 6 |
 | ランタイム | React 19.2 / React Native 0.86 |
@@ -95,7 +97,8 @@ mobile/
 | ncode.syosetu.com | 本文スクレイピング（縦書きリーダー用） |
 | novel18.syosetu.com | ノクターン本文スクレイピング |
 
-すべてアプリから直接通信（バックエンドサーバーなし）。
+すべてアプリから直接通信（バックエンドサーバーなし）。  
+本文パースは `<p id="L数字">` タグ抽出方式。サブタイトルは `<title>` タグからフォールバック取得。
 
 ## ライセンス
 
