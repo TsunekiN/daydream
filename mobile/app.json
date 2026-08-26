@@ -2,7 +2,7 @@
   "expo": {
     "name": "Daydream",
     "slug": "daydream",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "orientation": "portrait",
     "scheme": "daydream",
     "userInterfaceStyle": "automatic",

@@ -38,7 +38,7 @@ export default function ReaderScreen({ route, navigation }: Props) {
     try {
       // キャッシュを確認
       const cached = await getCachedEpisode(ncode, ep, site);
-      if (cached) {
+      if (cached && cached.subtitle) {
         setContent(cached);
         saveLastOpened(ncode.toUpperCase(), site, ep);
         setLoading(false);
@@ -92,14 +92,16 @@ export default function ReaderScreen({ route, navigation }: Props) {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === "reachedEnd") {
-        // 最後までスクロールしたら読了
         updateReadingProgress(ncode.toUpperCase(), site, currentEp, content?.total_episodes || undefined);
       } else if (msg.type === "scroll") {
-        // スクロール位置を定期保存
         if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
         scrollSaveTimer.current = setTimeout(() => {
           saveScrollPosition(ncode, site, currentEp, msg.position);
         }, 500);
+      } else if (msg.type === "nextEpisode") {
+        if (content?.next_number) setCurrentEp(content.next_number);
+      } else if (msg.type === "prevEpisode") {
+        if (content?.prev_number) setCurrentEp(content.prev_number);
       }
     } catch {}
   };
@@ -171,6 +173,7 @@ html, body {
   if (!el) return;
   var isV = getComputedStyle(el).writingMode.indexOf('vertical') >= 0;
   var sent = false;
+
   el.addEventListener('scroll', function() {
     var pos = isV ? Math.abs(el.scrollLeft) : el.scrollTop;
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'scroll', position: pos }));
@@ -181,6 +184,41 @@ html, body {
       if (atEnd) {
         sent = true;
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'reachedEnd' }));
+      }
+    }
+  });
+
+  // Edge swipe detection for episode navigation
+  var touchStartX = 0, touchStartY = 0;
+  el.addEventListener('touchstart', function(e) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  });
+  el.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    var dy = e.changedTouches[0].clientY - touchStartY;
+
+    if (isV) {
+      // Vertical writing: swipe left at start → prev, swipe right at end → next
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+        var atStart = Math.abs(el.scrollLeft) <= 10;
+        var atEnd = Math.abs(el.scrollLeft) + el.clientWidth >= el.scrollWidth - 10;
+        if (dx < -50 && atStart) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'prevEpisode' }));
+        } else if (dx > 50 && atEnd) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nextEpisode' }));
+        }
+      }
+    } else {
+      // Horizontal writing: swipe down at start → prev, swipe up at end → next
+      if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx)) {
+        var atTop = el.scrollTop <= 10;
+        var atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
+        if (dy > 50 && atTop) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'prevEpisode' }));
+        } else if (dy < -50 && atBottom) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nextEpisode' }));
+        }
       }
     }
   });

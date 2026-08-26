@@ -177,3 +177,49 @@ export function cleanTitle(title: string): string {
     .replace(/^(\s*(【[^】]*】|《[^》]*》|\[[^\]]*\])\s*)+/, "")
     .trim();
 }
+
+
+/** お気に入りの更新日・全話数を一括取得（ncodeリストからAPI取得） */
+export async function fetchBulkUpdated(
+  ncodes: { ncode: string; site: SiteMode }[]
+): Promise<Record<string, { novelupdated_at: string; general_all_no: number }>> {
+  const result: Record<string, { novelupdated_at: string; general_all_no: number }> = {};
+
+  // なろう・ノクターンを分離
+  const narouCodes = ncodes.filter(n => n.site === "narou").map(n => n.ncode);
+  const nocCodes = ncodes.filter(n => n.site === "nocturne").map(n => n.ncode);
+
+  const fetchBatch = async (codes: string[], apiBase: string, site: SiteMode) => {
+    if (codes.length === 0) return;
+    // APIは一度に最大500件
+    const q = new URLSearchParams({
+      out: "json",
+      ncode: codes.join("-"),
+      of: "n-nu-ga",
+      lim: String(codes.length),
+    });
+    try {
+      const resp = await fetch(`${apiBase}?${q}`, { headers: { "User-Agent": UA } });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (!Array.isArray(data)) return;
+      for (let i = 1; i < data.length; i++) {
+        const item = data[i];
+        const ncode = String(item.ncode ?? "").toUpperCase();
+        if (ncode) {
+          result[`${site}:${ncode}`] = {
+            novelupdated_at: String(item.novelupdated_at ?? ""),
+            general_all_no: Number(item.general_all_no ?? 0),
+          };
+        }
+      }
+    } catch {}
+  };
+
+  await Promise.all([
+    fetchBatch(narouCodes, NAROU_API, "narou"),
+    fetchBatch(nocCodes, R18_API, "nocturne"),
+  ]);
+
+  return result;
+}

@@ -5,10 +5,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
 import { getFavorites, getLastOpened, removeFavorite } from "../lib/storage";
-import { cleanTitle } from "../lib/api";
+import { cleanTitle, fetchBulkUpdated } from "../lib/api";
 import { useTheme } from "../lib/ThemeContext";
 import type { FavoriteNovel } from "../lib/types";
 import { useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
@@ -28,6 +29,31 @@ export default function HomeScreen({ navigation }: Props) {
     // 最終更新日が新しい順にソート
     favs.sort((a, b) => (b.lastUpdated ?? "").localeCompare(a.lastUpdated ?? ""));
     setFavorites(favs);
+
+    // バックグラウンドで最新の更新日を取得
+    if (favs.length > 0) {
+      const updates = await fetchBulkUpdated(favs.map(f => ({ ncode: f.ncode, site: f.site })));
+      let changed = false;
+      for (const fav of favs) {
+        const key = `${fav.site}:${fav.ncode}`;
+        const info = updates[key];
+        if (info) {
+          if (info.novelupdated_at && info.novelupdated_at !== fav.lastUpdated) {
+            fav.lastUpdated = info.novelupdated_at;
+            changed = true;
+          }
+          if (info.general_all_no && info.general_all_no !== fav.totalEpisodes) {
+            fav.totalEpisodes = info.general_all_no;
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        await AsyncStorage.setItem("@daydream/favorites", JSON.stringify(favs));
+        favs.sort((a, b) => (b.lastUpdated ?? "").localeCompare(a.lastUpdated ?? ""));
+        setFavorites([...favs]);
+      }
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { loadFavorites(); }, [loadFavorites]));
