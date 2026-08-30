@@ -1,8 +1,8 @@
 # Daydream — Specifications
 
-**Version**: 0.5.0  
+**Version**: 0.5.1  
 **Platform**: Android (React Native / Expo)  
-**Last Updated**: 2026-08-26
+**Last Updated**: 2026-08-28
 
 ---
 
@@ -117,7 +117,33 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 | 言語 | TypeScript 6.0 |
 | ランタイム | React 19.2.3 / React Native 0.86.2 |
 
-### 3.2 データモデル
+### 3.2 モジュール構成
+
+```
+mobile/
+├── App.tsx                  # ルート（ThemeProvider + NavigationContainer）
+├── screens/
+│   ├── HomeScreen.tsx       # お気に入り一覧
+│   ├── SearchScreen.tsx     # 検索（フィルタ・ソート付き）
+│   ├── NovelDetailScreen.tsx # 作品情報 + 話数選択
+│   ├── ReaderScreen.tsx     # リーダー画面（ヘッダー/フッター/WebView統合）
+│   ├── InlinePlayer.tsx     # TTS インラインプレイヤー
+│   ├── SettingsScreen.tsx   # 設定画面
+│   └── Slider.tsx           # カスタムスライダー（話数選択用）
+├── lib/
+│   ├── api.ts               # なろうAPI通信 + HTMLスクレイピング
+│   ├── cache.ts             # エピソード本文LRUキャッシュ
+│   ├── readerHtml.ts        # リーダー用 HTML/CSS/JS 生成
+│   ├── storage.ts           # AsyncStorage お気に入り/スクロール位置管理
+│   ├── settings.ts          # 設定型定義 + 永続化（深いマージ対応）
+│   ├── speech.ts            # TTS エンジン（expo-speech シングルトン）
+│   ├── ThemeContext.tsx      # テーマ/設定 Context Provider
+│   ├── types.ts             # 共有型定義
+│   └── utils.ts             # 共通ユーティリティ（stripTags, formatNumber等）
+└── package.json
+```
+
+### 3.3 データモデル
 
 **FavoriteNovel:**
 ```typescript
@@ -149,7 +175,7 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 }
 ```
 
-### 3.3 ストレージキー
+### 3.4 ストレージキー
 
 | キー | 内容 |
 |------|------|
@@ -161,7 +187,7 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 
 アンインストール時に自動削除（Android アプリサンドボックス）。
 
-### 3.4 本文キャッシュ
+### 3.5 本文キャッシュ
 
 | 項目 | 仕様 |
 |------|------|
@@ -172,7 +198,7 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 | ヒット時 | ネットワーク通信なし（オフライン再読可能） |
 | 保存タイミング | ネットワークから取得成功時 |
 
-### 3.5 外部通信
+### 3.6 外部通信
 
 | エンドポイント | 用途 |
 |----------------|------|
@@ -266,8 +292,10 @@ HTMLタグ内のテキストには適用しない（タグ部分をスキップ�
 |------------|----------------|
 | none | フィルタなし |
 | light | notbl=1, notgl=1 |
-| medium | notbl=1, notgl=1 + 恋愛ジャンル除外 |
-| strong | notbl=1, notgl=1 + 恋愛除外 + 除外ワード |
+| medium | notbl=1, notgl=1 + notgenre=101-102（恋愛ジャンル除外） |
+| strong | notbl=1, notgl=1 + notgenre=101-102 + notword（除外キーワード） |
+
+除外フィルタは `excludePreset` 設定値に基づき `searchNovels` 関数内で API パラメータに変換される。
 
 ---
 

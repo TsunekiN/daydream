@@ -1,4 +1,5 @@
 import type { SearchParams, SearchResult, NovelInfo, NovelMeta, TocEntry, EpisodeContent, SiteMode } from "./types";
+import { stripTags } from "./utils";
 
 const NAROU_API = "https://api.syosetu.com/novelapi/api/";
 const R18_API = "https://api.syosetu.com/novel18api/api/";
@@ -8,7 +9,6 @@ const UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Geck
 
 function getApiBase(site: SiteMode) { return site === "nocturne" ? R18_API : NAROU_API; }
 function getSiteBase(site: SiteMode) { return site === "nocturne" ? NOCTURNE_BASE : NAROU_BASE; }
-function stripTags(html: string) { return html.replace(/<[^>]*>/g, ""); }
 
 export async function searchNovels(params: SearchParams, site: SiteMode = "narou"): Promise<SearchResult> {
   const q: Record<string, string> = {
@@ -20,6 +20,19 @@ export async function searchNovels(params: SearchParams, site: SiteMode = "narou
   if (params.writer) q.wname = params.writer;
   if (params.genre) q.genre = String(params.genre);
   if (params.st) q.st = String(params.st);
+
+  // 除外フィルタ
+  if (params.excludePreset && params.excludePreset !== "none") {
+    q.notbl = "1";
+    q.notgl = "1";
+    if (params.excludePreset === "medium" || params.excludePreset === "strong") {
+      // 恋愛ジャンル除外 (101: 異世界恋愛, 102: 現実世界恋愛)
+      q.notgenre = "101-102";
+    }
+    if (params.excludePreset === "strong") {
+      q.notword = "ハーレム 逆ハーレム 悪役令嬢";
+    }
+  }
 
   const resp = await fetch(`${getApiBase(site)}?${new URLSearchParams(q)}`, { headers: { "User-Agent": UA } });
   if (!resp.ok) throw new Error(`API検索エラー: ${resp.status}`);
@@ -93,16 +106,28 @@ export async function getEpisodeContent(ncode: string, episode: number, site: Si
   if (!resp.ok) throw new Error(`本文取得エラー: ${resp.status}`);
   const html = await resp.text();
 
-  // subtitle
-  const subtitleMatch = html.match(/<p[^>]*class="[^"]*p-novel__title[^"]*"[^>]*>([\s\S]*?)<\/p>/i)
-    ?? html.match(/<[^>]*class="[^"]*novel_subtitle[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/i);
-  let subtitle = subtitleMatch ? stripTags(subtitleMatch[1]).trim() : "";
+  // subtitle - 各話タイトル
+  let subtitle = "";
 
-  // フォールバック: <title>作品名 - サブタイトル</title> から抽出
+  // 方法1: 新デザイン <div class="p-novel__subtitle-episode">各話タイトル</div>（最も信頼性が高い）
+  const episodeMatch = html.match(/<[^>]*class="[^"]*p-novel__subtitle-episode[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/i);
+  if (episodeMatch) subtitle = stripTags(episodeMatch[1]).trim();
+
+  // 方法2: 新デザイン汎用 <... class="p-novel__title"> / <... class="p-novel__subtitle">
   if (!subtitle) {
-    const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
-    if (titleMatch && titleMatch[1].includes(" - ")) {
-      subtitle = titleMatch[1].split(" - ").slice(1).join(" - ").trim();
+    const subtitleMatch = html.match(/<[^>]*class="[^"]*p-novel__title[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/i)
+      ?? html.match(/<[^>]*class="[^"]*p-novel__subtitle(?![-])[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/i)
+      ?? html.match(/<[^>]*class="[^"]*novel_subtitle[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/i);
+    if (subtitleMatch) subtitle = stripTags(subtitleMatch[1]).trim();
+  }
+
+  // 方法3: フォールバック <title>作品名 - サブタイトル</title>
+  // 作品名にハイフンが含まれる場合があるため、最後の区切り以降をサブタイトルとみなす
+  if (!subtitle) {
+    const titleTagMatch = html.match(/<title>([^<]*)<\/title>/i);
+    if (titleTagMatch && titleTagMatch[1].includes(" - ")) {
+      const parts = titleTagMatch[1].split(" - ").map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 2) subtitle = parts[parts.length - 1];
     }
   }
 
@@ -158,26 +183,6 @@ export function extractParagraphs(bodyHtml: string): string[] {
   }
   return paragraphs;
 }
-
-export function formatNumber(num: number): string {
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
-  return num.toString();
-}
-
-export function formatLength(length: number): string {
-  if (length >= 10_000) return `${(length / 10_000).toFixed(1)}万字`;
-  return `${length.toLocaleString()}字`;
-}
-
-
-/** タイトル先頭の【...】や《...》や[...]のタグ情報を除去 */
-export function cleanTitle(title: string): string {
-  return title
-    .replace(/^(\s*(【[^】]*】|《[^》]*》|\[[^\]]*\])\s*)+/, "")
-    .trim();
-}
-
 
 /** お気に入りの更新日・全話数を一括取得（ncodeリストからAPI取得） */
 export async function fetchBulkUpdated(

@@ -4,20 +4,14 @@ import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
-import { getFavorites, getLastOpened, removeFavorite } from "../lib/storage";
-import { cleanTitle, fetchBulkUpdated } from "../lib/api";
+import { getFavorites, getLastOpened, removeFavorite, saveFavorites } from "../lib/storage";
+import { fetchBulkUpdated } from "../lib/api";
+import { cleanTitle, formatDate } from "../lib/utils";
 import { useTheme } from "../lib/ThemeContext";
 import type { FavoriteNovel } from "../lib/types";
 import { useFocusEffect } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr.replace(" ", "T"));
-  if (isNaN(d.getTime())) return dateStr.split(" ")[0];
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-}
 
 export default function HomeScreen({ navigation }: Props) {
   const { colors } = useTheme();
@@ -49,7 +43,7 @@ export default function HomeScreen({ navigation }: Props) {
         }
       }
       if (changed) {
-        await AsyncStorage.setItem("@daydream/favorites", JSON.stringify(favs));
+        await saveFavorites(favs);
         favs.sort((a, b) => (b.lastUpdated ?? "").localeCompare(a.lastUpdated ?? ""));
         setFavorites([...favs]);
       }

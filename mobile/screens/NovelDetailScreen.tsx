@@ -6,7 +6,8 @@ import {
 import Slider from "./Slider";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
-import { getNovelInfo, cleanTitle } from "../lib/api";
+import { getNovelInfo } from "../lib/api";
+import { cleanTitle } from "../lib/utils";
 import { addFavorite, removeFavorite, isFavorite as checkIsFavorite, getFavorites } from "../lib/storage";
 import { useTheme } from "../lib/ThemeContext";
 import type { NovelInfo, SiteMode } from "../lib/types";

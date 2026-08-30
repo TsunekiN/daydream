@@ -8,8 +8,8 @@ export interface SearchParams {
   order?: string;
   limit?: number;
   st?: number;
-  notbl?: boolean;
-  notgl?: boolean;
+  /** 除外フィルタプリセット */
+  excludePreset?: "none" | "light" | "medium" | "strong";
 }
 
 export interface SearchResult {
@@ -36,16 +36,7 @@ export interface NovelMeta {
   novelupdated_at: string;
 }
 
-export interface NovelInfo {
-  ncode: string;
-  title: string;
-  writer: string;
-  story: string;
-  genre: number;
-  keyword: string;
-  general_all_no: number;
-  novelupdated_at: string;
-}
+export type NovelInfo = Pick<NovelMeta, "ncode" | "title" | "writer" | "story" | "genre" | "keyword" | "general_all_no" | "novelupdated_at">;
 
 export interface TocEntry {
   number: number;

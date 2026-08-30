@@ -6,7 +6,7 @@ React Native (Expo SDK 57) で構築。バックエンド不要、全データ�
 ## 機能一覧
 
 - 📚 **お気に入り管理** — 最終更新日順ソート、読了進捗表示、タップで続きから直接再開、API自動更新
-- 🔍 **統合小説検索** — なろう/ノクターン切替、ジャンル・ソート順フィルタ、更新日表示
+- 🔍 **統合小説検索** — なろう/ノクターン切替、ジャンル・ソート順フィルタ、除外フィルタ（BL/GL/恋愛）
 - 📖 **縦書き/横書きリーダー** — WebView + CSS writing-mode、縦中横対応、スワイプで前後話切替
 - 📍 **スクロール位置記憶** — 話の途中で閉じても次回同じ位置から再開
 - ✅ **読了管理** — 最後までスクロールして初めて読了判定
@@ -58,20 +58,39 @@ mobile/
 │   ├── HomeScreen.tsx       # お気に入り一覧
 │   ├── SearchScreen.tsx     # 検索（フィルタ・ソート付き）
 │   ├── NovelDetailScreen.tsx # 作品情報 + 話数選択
-│   ├── ReaderScreen.tsx     # 縦書き/横書きリーダー + TTS
+│   ├── ReaderScreen.tsx     # リーダー画面（ヘッダー/フッター/WebView統合）
+│   ├── InlinePlayer.tsx     # TTS インラインプレイヤー
 │   ├── SettingsScreen.tsx   # 設定画面
-│   └── Slider.tsx           # カスタムスライダー
+│   └── Slider.tsx           # カスタムスライダー（話数選択用）
 ├── lib/
 │   ├── api.ts               # なろうAPI + スクレイピング
 │   ├── cache.ts             # エピソード本文キャッシュ（LRU 10件）
-│   ├── storage.ts           # AsyncStorage お気に入り管理
+│   ├── readerHtml.ts        # リーダー用 HTML/CSS/JS 生成
+│   ├── storage.ts           # AsyncStorage お気に入り/スクロール位置管理
 │   ├── settings.ts          # 設定型定義 + 永続化
 │   ├── speech.ts            # TTS エンジン（expo-speech）
 │   ├── ThemeContext.tsx      # テーマ Context（dark/light/system）
-│   └── types.ts             # 型定義
+│   ├── types.ts             # 型定義
+│   └── utils.ts             # 共通ユーティリティ（文字列処理・フォーマット）
 ├── app.json                 # Expo 設定
 ├── tsconfig.json
 └── package.json
+```
+
+## アーキテクチャ
+
+```
+App.tsx (ThemeProvider + NavigationContainer)
+  ├── screens/ ─── 画面コンポーネント（表示ロジック）
+  └── lib/     ─── ビジネスロジック・データ層
+        ├── api.ts        HTTP通信・HTMLパース
+        ├── readerHtml.ts リーダーHTML生成（CSS writing-mode）
+        ├── storage.ts    永続化（AsyncStorage）
+        ├── cache.ts      本文LRUキャッシュ
+        ├── settings.ts   設定スキーマ・保存/読込
+        ├── speech.ts     TTSエンジン（シングルトン）
+        ├── utils.ts      純粋関数ユーティリティ
+        └── types.ts      共有型定義
 ```
 
 ## 画面遷移

@@ -5,7 +5,8 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
-import { searchNovels, formatNumber, formatLength, cleanTitle } from "../lib/api";
+import { searchNovels } from "../lib/api";
+import { formatNumber, formatLength, cleanTitle } from "../lib/utils";
 import { useTheme } from "../lib/ThemeContext";
 import type { NovelMeta, SiteMode } from "../lib/types";
 
@@ -61,15 +62,12 @@ export default function SearchScreen({ navigation }: Props) {
     Keyboard.dismiss();
     setLoading(true); setError(null);
     try {
-      const notbl = settings?.excludePreset !== "none";
-      const notgl = settings?.excludePreset !== "none";
       const result = await searchNovels({
         word: query.trim() || undefined,
         genre,
         order,
         limit: 30,
-        notbl,
-        notgl,
+        excludePreset: settings.excludePreset,
       }, site);
       setResults(result.novels); setAllcount(result.allcount);
     } catch (e) { setError(e instanceof Error ? e.message : "検索に失敗しました"); setResults([]); }
