@@ -1,8 +1,9 @@
-import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme, DarkTheme, type NavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
+import { View, TouchableOpacity, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRef, useState, useEffect } from "react";
-import { ThemeProvider, useTheme } from "./lib/ThemeContext";
+import { ThemeProvider, useTheme, type ThemeColors } from "./lib/ThemeContext";
 import HomeScreen from "./screens/HomeScreen";
 import SearchScreen from "./screens/SearchScreen";
 import NovelDetailScreen from "./screens/NovelDetailScreen";
@@ -20,7 +21,7 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function AppContent() {
-  const navRef = useRef<any>(null);
+  const navRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const { isDark, colors } = useTheme();
 
   const navTheme = isDark
@@ -58,7 +59,7 @@ export default function App() {
   );
 }
 
-function SettingsFab({ navRef, isDark, colors }: { navRef: React.RefObject<any>; isDark: boolean; colors: any }) {
+function SettingsFab({ navRef, isDark, colors }: { navRef: React.RefObject<NavigationContainerRef<RootStackParamList> | null>; isDark: boolean; colors: ThemeColors }) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -81,7 +82,7 @@ function SettingsFab({ navRef, isDark, colors }: { navRef: React.RefObject<any>;
       onPress={handlePress}
       activeOpacity={0.8}
     >
-      <Text style={[fabStyles.fabText, { color: isDark ? "#F0F0F0" : "#333" }]}>⚙</Text>
+      <Ionicons name="settings-outline" size={18} color={isDark ? "#F0F0F0" : "#555"} />
     </TouchableOpacity>
   );
 }
@@ -95,5 +96,4 @@ const fabStyles = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4,
     zIndex: 999,
   },
-  fabText: { fontSize: 18 },
 });

@@ -1,7 +1,29 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { FavoriteNovel } from "./types";
 
+// ============================================================
+// ストレージキー
+// ============================================================
+
 const FAVORITES_KEY = "@daydream/favorites";
+const SCROLL_KEY = "@daydream/scroll-positions";
+const LAST_OPENED_KEY = "@daydream/last-opened";
+
+// ============================================================
+// キービルダー（キーパターンの一元管理）
+// ============================================================
+
+function lastOpenedKey(ncode: string, site: string): string {
+  return `${site}:${ncode.toLowerCase()}`;
+}
+
+function scrollKey(ncode: string, site: string, episode: number): string {
+  return `${site}:${ncode.toLowerCase()}:${episode}`;
+}
+
+// ============================================================
+// お気に入り管理
+// ============================================================
 
 export async function getFavorites(): Promise<FavoriteNovel[]> {
   try {
@@ -11,17 +33,22 @@ export async function getFavorites(): Promise<FavoriteNovel[]> {
   } catch { return []; }
 }
 
+/** お気に入り配列を一括保存 */
+export async function saveFavorites(favorites: FavoriteNovel[]): Promise<void> {
+  await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+}
+
 export async function addFavorite(novel: FavoriteNovel): Promise<void> {
   const favorites = await getFavorites();
   const idx = favorites.findIndex(f => f.ncode === novel.ncode && f.site === novel.site);
   if (idx >= 0) favorites[idx] = { ...favorites[idx], ...novel };
   else favorites.unshift(novel);
-  await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  await saveFavorites(favorites);
 }
 
 export async function removeFavorite(ncode: string, site: string): Promise<void> {
   const favorites = await getFavorites();
-  await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites.filter(f => !(f.ncode === ncode && f.site === site))));
+  await saveFavorites(favorites.filter(f => !(f.ncode === ncode && f.site === site)));
 }
 
 export async function isFavorite(ncode: string, site: string): Promise<boolean> {
@@ -35,23 +62,20 @@ export async function updateReadingProgress(ncode: string, site: string, episode
   if (idx >= 0) {
     favorites[idx].lastReadEpisode = episode;
     if (totalEpisodes !== undefined) favorites[idx].totalEpisodes = totalEpisodes;
-    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    await saveFavorites(favorites);
   }
 }
 
 // ============================================================
-// スクロール位置保存
+// 最後に開いたエピソード
 // ============================================================
-
-const SCROLL_KEY = "@daydream/scroll-positions";
-const LAST_OPENED_KEY = "@daydream/last-opened";
 
 /** 最後に開いていたエピソードを保存 */
 export async function saveLastOpened(ncode: string, site: string, episode: number): Promise<void> {
   try {
     const json = await AsyncStorage.getItem(LAST_OPENED_KEY);
     const data: Record<string, number> = json ? JSON.parse(json) : {};
-    data[`${site}:${ncode.toLowerCase()}`] = episode;
+    data[lastOpenedKey(ncode, site)] = episode;
     await AsyncStorage.setItem(LAST_OPENED_KEY, JSON.stringify(data));
   } catch {}
 }
@@ -62,16 +86,20 @@ export async function getLastOpened(ncode: string, site: string): Promise<number
     const json = await AsyncStorage.getItem(LAST_OPENED_KEY);
     if (!json) return null;
     const data: Record<string, number> = JSON.parse(json);
-    return data[`${site}:${ncode.toLowerCase()}`] ?? null;
+    return data[lastOpenedKey(ncode, site)] ?? null;
   } catch { return null; }
 }
+
+// ============================================================
+// スクロール位置保存
+// ============================================================
 
 /** スクロール位置を保存 */
 export async function saveScrollPosition(ncode: string, site: string, episode: number, position: number): Promise<void> {
   try {
     const json = await AsyncStorage.getItem(SCROLL_KEY);
     const data: Record<string, number> = json ? JSON.parse(json) : {};
-    data[`${site}:${ncode.toLowerCase()}:${episode}`] = position;
+    data[scrollKey(ncode, site, episode)] = position;
     await AsyncStorage.setItem(SCROLL_KEY, JSON.stringify(data));
   } catch {}
 }
@@ -82,6 +110,6 @@ export async function getScrollPosition(ncode: string, site: string, episode: nu
     const json = await AsyncStorage.getItem(SCROLL_KEY);
     if (!json) return 0;
     const data: Record<string, number> = JSON.parse(json);
-    return data[`${site}:${ncode.toLowerCase()}:${episode}`] ?? 0;
+    return data[scrollKey(ncode, site, episode)] ?? 0;
   } catch { return 0; }
 }

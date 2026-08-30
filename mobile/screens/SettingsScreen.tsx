@@ -2,7 +2,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-nati
 import { WebView } from "react-native-webview";
 import NativeSlider from "@react-native-community/slider";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import Slider from "./Slider";
 import type { RootStackParamList } from "../App";
 import { useTheme } from "../lib/ThemeContext";
 import {

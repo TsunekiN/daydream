@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useColorScheme } from "react-native";
 import { loadSettings, saveSettings, type AppSettings, DEFAULT_SETTINGS } from "./settings";
 
-interface ThemeColors {
+export interface ThemeColors {
   background: string;
   card: string;
   text: string;

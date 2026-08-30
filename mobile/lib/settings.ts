@@ -55,7 +55,12 @@ export async function loadSettings(): Promise<AppSettings> {
   try {
     const json = await AsyncStorage.getItem(SETTINGS_KEY);
     if (!json) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(json) };
+    const saved = JSON.parse(json);
+    return {
+      ...DEFAULT_SETTINGS,
+      ...saved,
+      reader: { ...DEFAULT_SETTINGS.reader, ...(saved.reader ?? {}) },
+    };
   } catch { return DEFAULT_SETTINGS; }
 }
 
