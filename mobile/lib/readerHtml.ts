@@ -82,6 +82,7 @@ ${READER_SCRIPT}
 
 /**
  * WebView 内のスクロール監視 + スワイプ前後話検出スクリプト
+ * 画面全体を引っ張るラバーバンド + スライドアウトアニメーション付き
  */
 const READER_SCRIPT = `(function() {
   var el = document.querySelector('.reader');
@@ -89,6 +90,7 @@ const READER_SCRIPT = `(function() {
   var isV = getComputedStyle(el).writingMode.indexOf('vertical') >= 0;
   var sent = false;
 
+  // ── スクロール監視 ──────────────────────────────────────────
   el.addEventListener('scroll', function() {
     var pos = isV ? Math.abs(el.scrollLeft) : el.scrollTop;
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'scroll', position: pos }));
@@ -103,101 +105,174 @@ const READER_SCRIPT = `(function() {
     }
   });
 
-  // Edge swipe detection for episode navigation (with pull indicator)
+  // ── ラバーバンド + スライドアウトナビゲーション ───────────────
+  var THRESHOLD = 110;       // 遷移確定の引っ張り量 (px)
+  var RESISTANCE = 0.38;     // ラバーバンド係数（1 より小さいほど重い）
+  var SLIDE_OUT_PX = 320;    // 遷移時のスライドアウト距離 (px)
+
   var touchStartX = 0, touchStartY = 0;
-  var pullIndicator = document.createElement('div');
-  pullIndicator.style.cssText = 'position:fixed;top:50%;transform:translateY(-50%);padding:12px 16px;border-radius:20px;background:rgba(99,102,241,0.9);color:#fff;font-size:13px;font-weight:bold;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;';
-  document.body.appendChild(pullIndicator);
+  var dragging = false;
+  var dragAxis = '';          // 'h' | 'v' | ''
+  var dragEdge = '';          // 'start' | 'end' | ''（ページ端かどうか）
+  var navigating = false;     // 遷移アニメーション中フラグ
 
-  var pulling = false;
-  var pullDirection = '';
+  // ── ヘルパー: 画面を translate で動かす ─────────────────────
+  function setTranslate(px) {
+    var prop = isV ? 'translateX(' + px + 'px)' : 'translateY(' + px + 'px)';
+    document.body.style.transform = prop;
+  }
+  function snapBack() {
+    document.body.style.transition = 'transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94)';
+    document.body.style.transform = 'none';
+    setTimeout(function() { document.body.style.transition = ''; }, 360);
+  }
+  function slideOut(px, callback) {
+    document.body.style.transition = 'transform 0.22s cubic-bezier(0.4,0,1,1), opacity 0.22s';
+    document.body.style.opacity = '0';
+    setTranslate(px);
+    setTimeout(function() {
+      document.body.style.transition = '';
+      document.body.style.opacity = '';
+      document.body.style.transform = '';
+      navigating = false;
+      callback();
+    }, 230);
+  }
 
+  // ── インジケーターラベル ────────────────────────────────────
+  var indicator = document.createElement('div');
+  indicator.style.cssText = [
+    'position:fixed;z-index:9999;pointer-events:none;',
+    'padding:10px 18px;border-radius:24px;',
+    'background:rgba(99,102,241,0.88);color:#fff;',
+    'font-size:13px;font-weight:700;letter-spacing:0.02em;',
+    'opacity:0;transition:opacity 0.15s;'
+  ].join('');
+  document.body.appendChild(indicator);
+
+  function positionIndicator(dir) {
+    if (isV) {
+      indicator.style.top = '50%';
+      indicator.style.bottom = '';
+      indicator.style.left = (dir === 'prev') ? '12px' : '';
+      indicator.style.right = (dir === 'next') ? '12px' : '';
+      indicator.style.transform = 'translateY(-50%)';
+    } else {
+      indicator.style.left = '50%';
+      indicator.style.transform = 'translateX(-50%)';
+      indicator.style.top = (dir === 'prev') ? '20px' : '';
+      indicator.style.bottom = (dir === 'next') ? '20px' : '';
+      indicator.style.right = '';
+    }
+  }
+  function updateIndicator(dir, ratio) {
+    if (ratio <= 0) { indicator.style.opacity = '0'; return; }
+    positionIndicator(dir);
+    var pct = Math.round(Math.min(ratio, 1) * 100);
+    var ready = ratio >= 1;
+    if (isV) {
+      indicator.textContent = (dir === 'next')
+        ? (ready ? '\\u6b21\\u8a71\\u3078 \\u2192' : pct + '% \\u2192')
+        : (ready ? '\\u2190 \\u524d\\u8a71\\u3078' : '\\u2190 ' + pct + '%');
+    } else {
+      indicator.textContent = (dir === 'next')
+        ? (ready ? '\\u2191 \\u6b21\\u8a71\\u3078' : '\\u2191 ' + pct + '%')
+        : (ready ? '\\u2193 \\u524d\\u8a71\\u3078' : '\\u2193 ' + pct + '%');
+    }
+    indicator.style.opacity = String(Math.min(1, ratio * 1.1));
+  }
+
+  // ── タッチイベント ─────────────────────────────────────────
   el.addEventListener('touchstart', function(e) {
+    if (navigating) return;
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
-    pulling = false;
-    pullDirection = '';
-    pullIndicator.style.opacity = '0';
-  });
+    dragging = false;
+    dragAxis = '';
+    dragEdge = '';
+    indicator.style.opacity = '0';
+  }, { passive: true });
 
   el.addEventListener('touchmove', function(e) {
+    if (navigating) return;
     var dx = e.touches[0].clientX - touchStartX;
     var dy = e.touches[0].clientY - touchStartY;
-    var threshold = 100;
 
-    if (isV) {
-      var atStart = Math.abs(el.scrollLeft) <= 10;
-      var atEnd = Math.abs(el.scrollLeft) + el.clientWidth >= el.scrollWidth - 10;
-      if (atStart && dx < -30 && Math.abs(dx) > Math.abs(dy)) {
-        pulling = true;
-        pullDirection = 'prev';
-        pullIndicator.textContent = Math.abs(dx) >= threshold ? '\\u2190 \\u524d\\u8a71\\u3078' : '\\u2190 ' + Math.round(Math.abs(dx)/threshold*100) + '%';
-        pullIndicator.style.left = '16px';
-        pullIndicator.style.right = '';
-        pullIndicator.style.opacity = String(Math.min(1, Math.abs(dx) / threshold));
-      } else if (atEnd && dx > 30 && Math.abs(dx) > Math.abs(dy)) {
-        pulling = true;
-        pullDirection = 'next';
-        pullIndicator.textContent = Math.abs(dx) >= threshold ? '\\u6b21\\u8a71\\u3078 \\u2192' : Math.round(Math.abs(dx)/threshold*100) + '% \\u2192';
-        pullIndicator.style.right = '16px';
-        pullIndicator.style.left = '';
-        pullIndicator.style.opacity = String(Math.min(1, Math.abs(dx) / threshold));
-      } else {
-        pullIndicator.style.opacity = '0';
-      }
-    } else {
-      var atTop = el.scrollTop <= 10;
-      var atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
-      if (atTop && dy > 30 && Math.abs(dy) > Math.abs(dx)) {
-        pulling = true;
-        pullDirection = 'prev';
-        pullIndicator.textContent = Math.abs(dy) >= threshold ? '\\u2193 \\u524d\\u8a71\\u3078' : '\\u2193 ' + Math.round(Math.abs(dy)/threshold*100) + '%';
-        pullIndicator.style.left = '50%';
-        pullIndicator.style.transform = 'translateX(-50%)';
-        pullIndicator.style.top = '20px';
-        pullIndicator.style.opacity = String(Math.min(1, Math.abs(dy) / threshold));
-      } else if (atBottom && dy < -30 && Math.abs(dy) > Math.abs(dx)) {
-        pulling = true;
-        pullDirection = 'next';
-        pullIndicator.textContent = Math.abs(dy) >= threshold ? '\\u2191 \\u6b21\\u8a71\\u3078' : '\\u2191 ' + Math.round(Math.abs(dy)/threshold*100) + '%';
-        pullIndicator.style.left = '50%';
-        pullIndicator.style.transform = 'translateX(-50%)';
-        pullIndicator.style.top = '';
-        pullIndicator.style.bottom = '20px';
-        pullIndicator.style.opacity = String(Math.min(1, Math.abs(dy) / threshold));
-      } else {
-        pullIndicator.style.opacity = '0';
-      }
+    // 軸を最初の動きで固定
+    if (!dragAxis) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
+      dragAxis = (Math.abs(dx) >= Math.abs(dy)) ? 'h' : 'v';
     }
-  });
+
+    if (isV && dragAxis === 'h') {
+      // 縦書き: 横スワイプ
+      var atStart = Math.abs(el.scrollLeft) <= 8;
+      var atEnd   = Math.abs(el.scrollLeft) + el.clientWidth >= el.scrollWidth - 8;
+
+      if (!dragging) {
+        if (atEnd   && dx > 0) { dragging = true; dragEdge = 'end'; }
+        if (atStart && dx < 0) { dragging = true; dragEdge = 'start'; }
+      }
+      if (!dragging) return;
+
+      // ラバーバンド: 画面全体を動かす
+      var pull = (dragEdge === 'end' ? dx : dx) * RESISTANCE;
+      // 逆方向は引けないようにクランプ
+      if (dragEdge === 'end'   && pull < 0) pull = 0;
+      if (dragEdge === 'start' && pull > 0) pull = 0;
+      setTranslate(pull);
+      var dir = (dragEdge === 'end') ? 'next' : 'prev';
+      updateIndicator(dir, Math.abs(pull) / THRESHOLD);
+
+    } else if (!isV && dragAxis === 'v') {
+      // 横書き: 縦スワイプ
+      var atTop    = el.scrollTop <= 8;
+      var atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+
+      if (!dragging) {
+        if (atBottom && dy < 0) { dragging = true; dragEdge = 'end'; }
+        if (atTop    && dy > 0) { dragging = true; dragEdge = 'start'; }
+      }
+      if (!dragging) return;
+
+      var pull = dy * RESISTANCE;
+      if (dragEdge === 'end'   && pull > 0) pull = 0;
+      if (dragEdge === 'start' && pull < 0) pull = 0;
+      setTranslate(pull);
+      var dir = (dragEdge === 'end') ? 'next' : 'prev';
+      updateIndicator(dir, Math.abs(pull) / THRESHOLD);
+    }
+  }, { passive: true });
 
   el.addEventListener('touchend', function(e) {
+    if (navigating || !dragging) {
+      snapBack();
+      indicator.style.opacity = '0';
+      dragging = false; dragAxis = ''; dragEdge = '';
+      return;
+    }
+
     var dx = e.changedTouches[0].clientX - touchStartX;
     var dy = e.changedTouches[0].clientY - touchStartY;
-    var threshold = 100;
+    var pull = isV ? dx * RESISTANCE : dy * RESISTANCE;
+    var absPull = Math.abs(pull);
+    indicator.style.opacity = '0';
+    dragging = false; dragAxis = ''; dragEdge = '';
 
-    pullIndicator.style.opacity = '0';
-
-    if (isV) {
-      if (Math.abs(dx) >= threshold && Math.abs(dx) > Math.abs(dy)) {
-        var atStart = Math.abs(el.scrollLeft) <= 10;
-        var atEnd = Math.abs(el.scrollLeft) + el.clientWidth >= el.scrollWidth - 10;
-        if (dx < -threshold && atStart) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'prevEpisode' }));
-        } else if (dx > threshold && atEnd) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nextEpisode' }));
-        }
-      }
+    if (absPull >= THRESHOLD) {
+      // 閾値超え → スライドアウトして遷移
+      navigating = true;
+      var slideDir = isV
+        ? (pull > 0 ?  SLIDE_OUT_PX : -SLIDE_OUT_PX)
+        : (pull > 0 ?  SLIDE_OUT_PX : -SLIDE_OUT_PX);
+      slideOut(slideDir, function() {
+        var type = (isV ? (pull > 0 ? 'nextEpisode' : 'prevEpisode')
+                        : (pull < 0 ? 'nextEpisode' : 'prevEpisode'));
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: type }));
+      });
     } else {
-      if (Math.abs(dy) >= threshold && Math.abs(dy) > Math.abs(dx)) {
-        var atTop = el.scrollTop <= 10;
-        var atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
-        if (dy > threshold && atTop) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'prevEpisode' }));
-        } else if (dy < -threshold && atBottom) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nextEpisode' }));
-        }
-      }
+      // 閾値未満 → スナップバック
+      snapBack();
     }
-  });
+  }, { passive: true });
 })();`;
