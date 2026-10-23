@@ -14,6 +14,78 @@ import InlinePlayer from "./InlinePlayer";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Reader">;
 
+// ── サブコンポーネント ──────────────────────────────────────────────────────
+
+interface NavButtonProps {
+  label: string;
+  onPress: () => void;
+  disabled: boolean;
+  isDark: boolean;
+  accentColor: string;
+}
+
+function NavButton({ label, onPress, disabled, isDark, accentColor }: NavButtonProps) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.navBtn,
+        { backgroundColor: isDark ? "#2A2A2D" : "#F0F0F5" },
+        disabled && { opacity: 0.3 },
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      <Text style={[styles.navBtnText, { color: accentColor }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+interface FooterNavProps {
+  content: EpisodeContent;
+  currentEp: number;
+  totalDisplay: number;
+  isVertical: boolean;
+  isDark: boolean;
+  accentColor: string;
+  textMuted: string;
+  onNav: (ep: number) => void;
+}
+
+/** 縦書き/横書きで前後話ボタンの並び順を切り替えるフッター */
+function FooterNav({ content, currentEp, totalDisplay, isVertical, isDark, accentColor, textMuted, onNav }: FooterNavProps) {
+  const prevBtn = (
+    <NavButton
+      label={content.prev_number ? (isVertical ? `${content.prev_number}話 →` : `← ${content.prev_number}話`) : "―"}
+      onPress={() => content.prev_number && onNav(content.prev_number)}
+      disabled={!content.prev_number}
+      isDark={isDark}
+      accentColor={accentColor}
+    />
+  );
+  const nextBtn = (
+    <NavButton
+      label={content.next_number ? (isVertical ? `← ${content.next_number}話` : `${content.next_number}話 →`) : "―"}
+      onPress={() => content.next_number && onNav(content.next_number)}
+      disabled={!content.next_number}
+      isDark={isDark}
+      accentColor={accentColor}
+    />
+  );
+  const epLabel = (
+    <Text style={[styles.epText, { color: textMuted }]}>
+      {currentEp}{totalDisplay ? ` / ${totalDisplay}` : ""}話
+    </Text>
+  );
+  // 縦書き: 右→左方向なので [次話(←)] [話数] [前話(→)]
+  // 横書き: 左→右方向なので [前話(←)] [話数] [次話(→)]
+  return isVertical
+    ? <>{nextBtn}{epLabel}{prevBtn}</>
+    : <>{prevBtn}{epLabel}{nextBtn}</>;
+}
+
+
+// ── メイン画面 ──────────────────────────────────────────────────────
+
 export default function ReaderScreen({ route, navigation }: Props) {
   const { ncode, episode, site } = route.params;
   const { isDark, colors, settings } = useTheme();
@@ -24,6 +96,10 @@ export default function ReaderScreen({ route, navigation }: Props) {
   const [currentEp, setCurrentEp] = useState(episode);
   const [knownTotal, setKnownTotal] = useState(0);
 
+  // handleWebViewMessage はクロージャーで content を参照するため、
+  // 常に最新の content を ref で保持して stale closure を防ぐ
+  const contentRef = useRef<EpisodeContent | null>(null);
+
   // お気に入りから正確な total_episodes を取得
   useEffect(() => {
     getFavorites().then(favs => {
@@ -32,37 +108,58 @@ export default function ReaderScreen({ route, navigation }: Props) {
     });
   }, [ncode, site]);
 
+  const webViewRef = useRef<any>(null);
+  const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // content state と ref を同期するヘルパー
+  const updateContent = useCallback((c: EpisodeContent | null) => {
+    contentRef.current = c;
+    setContent(c);
+  }, []);
+
   const fetchContent = useCallback(async (ep: number) => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
+    updateContent(null);
     try {
-      // キャッシュを確認（subtitle と body_html が有効な場合のみ使用）
+      // キャッシュ確認（subtitle と body_html が有効な場合のみ使用）
       const cached = await getCachedEpisode(ncode, ep, site);
       if (cached && cached.subtitle && cached.body_html && cached.body_html.length > 50) {
-        setContent(cached);
+        // Stale-While-Revalidate:
+        // キャッシュを即座に表示しつつ、next_number 等のナビ情報が古い可能性があるため
+        // バックグラウンドでサーバーから最新データを取得して更新する
+        updateContent(cached);
         saveLastOpened(ncode.toUpperCase(), site, ep);
         setLoading(false);
+
+        getEpisodeContent(ncode, ep, site as SiteMode)
+          .then(fresh => {
+            if (!fresh.body_html || fresh.body_html.trim().length === 0) return;
+            cacheEpisode(ncode, ep, site, fresh);
+            updateContent(fresh);
+          })
+          .catch(() => { /* バックグラウンド失敗は無視 */ });
         return;
       }
 
       // ネットワークから取得
       const data = await getEpisodeContent(ncode, ep, site as SiteMode);
-      setContent(data);
       if (!data.body_html || data.body_html.trim().length === 0) {
         setError("本文の取得に失敗しました");
         return;
       }
-
-      // キャッシュに保存
+      updateContent(data);
       cacheEpisode(ncode, ep, site, data);
       saveLastOpened(ncode.toUpperCase(), site, ep);
-    } catch (e) { setError(e instanceof Error ? e.message : "取得に失敗しました"); }
-    finally { setLoading(false); }
-  }, [ncode, site]);
-
-  const webViewRef = useRef<any>(null);
-  const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "取得に失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  }, [ncode, site, updateContent]);
 
   useEffect(() => { fetchContent(currentEp); }, [currentEp, fetchContent]);
+
 
   // スクロール位置復元
   useEffect(() => {
@@ -87,23 +184,31 @@ export default function ReaderScreen({ route, navigation }: Props) {
     }
   }, [content, loading, currentEp]);
 
-  const handleWebViewMessage = (event: { nativeEvent: { data: string } }) => {
+  // WebView メッセージハンドラ
+  // contentRef を使うことで、バックグラウンド更新後も最新の next_number / prev_number を参照できる
+  const handleWebViewMessage = useCallback((event: { nativeEvent: { data: string } }) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
-      if (msg.type === "reachedEnd") {
-        updateReadingProgress(ncode.toUpperCase(), site, currentEp, content?.total_episodes || undefined);
-      } else if (msg.type === "scroll") {
-        if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
-        scrollSaveTimer.current = setTimeout(() => {
-          saveScrollPosition(ncode, site, currentEp, msg.position);
-        }, 500);
-      } else if (msg.type === "nextEpisode") {
-        if (content?.next_number) setCurrentEp(content.next_number);
-      } else if (msg.type === "prevEpisode") {
-        if (content?.prev_number) setCurrentEp(content.prev_number);
+      const c = contentRef.current;
+      switch (msg.type) {
+        case "reachedEnd":
+          updateReadingProgress(ncode.toUpperCase(), site, currentEp, c?.total_episodes || undefined);
+          break;
+        case "scroll":
+          if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
+          scrollSaveTimer.current = setTimeout(() => {
+            saveScrollPosition(ncode, site, currentEp, msg.position);
+          }, 500);
+          break;
+        case "nextEpisode":
+          if (c?.next_number) setCurrentEp(c.next_number);
+          break;
+        case "prevEpisode":
+          if (c?.prev_number) setCurrentEp(c.prev_number);
+          break;
       }
     } catch {}
-  };
+  }, [ncode, site, currentEp]);
 
   const html = content
     ? generateReaderHtml({
@@ -116,6 +221,7 @@ export default function ReaderScreen({ route, navigation }: Props) {
 
   const accentColor = colors.accent;
   const totalDisplay = content?.total_episodes || knownTotal;
+  const isVertical = settings.reader.layout === "vertical";
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -156,58 +262,19 @@ export default function ReaderScreen({ route, navigation }: Props) {
         />
       )}
 
-      {/* Footer */}
+      {/* フッター: 前後話ナビ */}
       {content && !loading && !error && (
         <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          {settings.reader.layout === "vertical" ? (
-            <>
-              <TouchableOpacity
-                style={[styles.navBtn, { backgroundColor: isDark ? "#2A2A2D" : "#F0F0F5" }, !content.next_number && { opacity: 0.3 }]}
-                onPress={() => content.next_number && setCurrentEp(content.next_number)}
-                disabled={!content.next_number}
-              >
-                <Text style={[styles.navBtnText, { color: accentColor }]}>
-                  {content.next_number ? `← ${content.next_number}話` : "―"}
-                </Text>
-              </TouchableOpacity>
-              <Text style={[styles.epText, { color: colors.textMuted }]}>
-                {currentEp}{totalDisplay ? ` / ${totalDisplay}` : ""}話
-              </Text>
-              <TouchableOpacity
-                style={[styles.navBtn, { backgroundColor: isDark ? "#2A2A2D" : "#F0F0F5" }, !content.prev_number && { opacity: 0.3 }]}
-                onPress={() => content.prev_number && setCurrentEp(content.prev_number)}
-                disabled={!content.prev_number}
-              >
-                <Text style={[styles.navBtnText, { color: accentColor }]}>
-                  {content.prev_number ? `${content.prev_number}話 →` : "―"}
-                </Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={[styles.navBtn, { backgroundColor: isDark ? "#2A2A2D" : "#F0F0F5" }, !content.prev_number && { opacity: 0.3 }]}
-                onPress={() => content.prev_number && setCurrentEp(content.prev_number)}
-                disabled={!content.prev_number}
-              >
-                <Text style={[styles.navBtnText, { color: accentColor }]}>
-                  {content.prev_number ? `← ${content.prev_number}話` : "―"}
-                </Text>
-              </TouchableOpacity>
-              <Text style={[styles.epText, { color: colors.textMuted }]}>
-                {currentEp}{totalDisplay ? ` / ${totalDisplay}` : ""}話
-              </Text>
-              <TouchableOpacity
-                style={[styles.navBtn, { backgroundColor: isDark ? "#2A2A2D" : "#F0F0F5" }, !content.next_number && { opacity: 0.3 }]}
-                onPress={() => content.next_number && setCurrentEp(content.next_number)}
-                disabled={!content.next_number}
-              >
-                <Text style={[styles.navBtnText, { color: accentColor }]}>
-                  {content.next_number ? `${content.next_number}話 →` : "―"}
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
+          <FooterNav
+            content={content}
+            currentEp={currentEp}
+            totalDisplay={totalDisplay}
+            isVertical={isVertical}
+            isDark={isDark}
+            accentColor={accentColor}
+            textMuted={colors.textMuted}
+            onNav={setCurrentEp}
+          />
         </View>
       )}
     </SafeAreaView>

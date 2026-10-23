@@ -7,7 +7,7 @@ React Native (Expo SDK 57) で構築。バックエンド不要、全データ�
 
 - 📚 **お気に入り管理** — 最終更新日順ソート、読了進捗表示、タップで続きから直接再開、API自動更新
 - 🔍 **統合小説検索** — なろう/ノクターン切替、ジャンル・ソート順フィルタ、除外フィルタ（BL/GL/恋愛）
-- 📖 **縦書き/横書きリーダー** — WebView + CSS writing-mode、縦中横対応、スワイプで前後話切替
+- 📖 **縦書き/横書きリーダー** — WebView + CSS writing-mode、縦中横対応、スワイプで前後話切替（ラバーバンドアニメーション付き）
 - 📍 **スクロール位置記憶** — 話の途中で閉じても次回同じ位置から再開
 - ✅ **読了管理** — 最後までスクロールして初めて読了判定
 - 🔊 **TTS読み上げ** — expo-speech、速度調整（0.75x〜2x）
@@ -15,7 +15,7 @@ React Native (Expo SDK 57) で構築。バックエンド不要、全データ�
 - ⚙ **設定** — 書体、文字サイズ、行間、字間、表示方向、除外フィルタ
 - 🏷️ **タイトルクリーニング** — 先頭の【タグ】を自動除去
 - 📱 **完全ローカル** — クラウド接続なし、アンインストールで全データ削除
-- 💾 **本文キャッシュ** — 最新10話分をローカル保存、オフライン再読可能
+- 💾 **本文キャッシュ** — 最新10話分をローカル保存、オフライン再読可能（Stale-While-Revalidate方式で常に最新ナビ情報を維持）
 
 ## 技術スタック
 
@@ -26,7 +26,7 @@ React Native (Expo SDK 57) で構築。バックエンド不要、全データ�
 | データ保存 | AsyncStorage |
 | リーダー | react-native-webview (CSS vertical-rl) |
 | スライダー | @react-native-community/slider |
-| スワイプ | react-native-gesture-handler + reanimated |
+| スワイプ | WebView内JS（react-native-gesture-handler 不使用） |
 | TTS | expo-speech |
 | 言語 | TypeScript 6 |
 | ランタイム | React 19.2 / React Native 0.86 |

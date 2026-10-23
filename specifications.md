@@ -1,8 +1,8 @@
 # Daydream — Specifications
 
-**Version**: 0.5.1  
+**Version**: 0.6.0  
 **Platform**: Android (React Native / Expo)  
-**Last Updated**: 2026-08-28
+**Last Updated**: 2026-10-24
 
 ---
 
@@ -83,7 +83,9 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 | スクロール位置 | 500msデバウンスで保存、次回復元（話の途中から再開可能） |
 | 最後に開いた話 | エピソード表示時に保存、お気に入りリストから直接再開に使用 |
 | 戻るボタン | 常に作品詳細画面に遷移 |
-| スワイプ前後話 | 縦書き: 先頭で左スワイプ→前話、末尾で右スワイプ→次話 / 横書き: 先頭で下スワイプ→前話、末尾で上スワイプ→次話 |
+| スワイプ前後話 | 縦書き: 末尾で右スワイプ→次話、先頭で左スワイプ→前話 / 横書き: 末尾で上スワイプ→次話、先頭で下スワイプ→前話 |
+| スワイプ挙動 | へージ端到達時に引っ張ると画面全体がラバーバンドで引っ張られる。閾値（110px）超えでスライドアウト遷移、未満でスナップバック |
+| 動作正確性キャッシュ | Stale-While-Revalidate：キャッシュを即座に表示し、バックグラウンドでnext_number等ナビ情報を更新 |
 | 読書進捗 | 読了時に AsyncStorage に記録 |
 
 ### 2.5 設定画面
@@ -112,7 +114,7 @@ Daydream は、小説家になろう / ノクターンノベルズの作品を�
 | データ永続化 | @react-native-async-storage/async-storage |
 | リーダー | react-native-webview |
 | スライダー | @react-native-community/slider |
-| スワイプ削除 | react-native-gesture-handler / react-native-reanimated |
+| スワイプ | WebView内JS（react-native-gesture-handler 不使用） |
 | TTS | expo-speech |
 | 言語 | TypeScript 6.0 |
 | ランタイム | React 19.2.3 / React Native 0.86.2 |
@@ -191,12 +193,12 @@ mobile/
 
 | 項目 | 仕様 |
 |------|------|
-| 方式 | LRU（Least Recently Used） |
+| 方式 | Stale-While-Revalidate LRU |
 | 保持件数 | 最新10話分 |
 | キー形式 | `site:ncode:episode` |
 | データ | EpisodeContent（subtitle, body_html, prev/next, total） |
-| ヒット時 | ネットワーク通信なし（オフライン再読可能） |
-| 保存タイミング | ネットワークから取得成功時 |
+| キャッシュヒット時 | 即座に表示し、同時にバックグラウンドでサーバーからnext_number等を再取得して更新 |
+| 保存タイミング | ネットワーク取得成功時＋バックグラウンド再取得成功時 |
 
 ### 3.6 外部通信
 
